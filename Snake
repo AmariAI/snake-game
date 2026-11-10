@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="A snake arcade style game by C00lBoss">
+  <title>Snake Game — C00lBoss</title>
+  <style>
+    :root{color-scheme:dark;--cyan:#5ee7f7;--lime:#a3ff6f;--panel:rgba(7,17,31,.82);--line:rgba(164,210,231,.16)}
+    *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#07111f;color:#eff8ff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none}
+    #game{position:fixed;inset:0;width:100%;height:100%;display:block}
+    .topbar{position:fixed;z-index:2;top:16px;left:16px;right:16px;display:flex;align-items:flex-start;justify-content:space-between;pointer-events:none;gap:12px}
+    .brand,.stats,.leaderboard{background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(12px);box-shadow:0 12px 35px #0005;border-radius:16px}
+    .brand{padding:10px 15px}.brand strong{display:block;font-size:15px;letter-spacing:.13em}.brand small{display:block;color:#9eb8ca;font-size:10px;letter-spacing:.16em;margin-top:3px}
+    .stats{display:flex;gap:18px;padding:10px 16px}.stat label{display:block;color:#91a9bc;font-size:9px;letter-spacing:.14em;text-transform:uppercase}.stat b{font-size:17px;font-variant-numeric:tabular-nums}
+    .leaderboard{width:190px;padding:12px 14px}.leaderboard h3{margin:0 0 7px;font-size:10px;letter-spacing:.16em;color:#9db6c9}.leaderboard ol{margin:0;padding:0;list-style:none;font-size:12px}.leaderboard li{display:flex;justify-content:space-between;padding:3px 0;color:#d4e5ef}.leaderboard li.you{color:var(--lime);font-weight:700}
+    .tip{position:fixed;z-index:2;bottom:15px;left:50%;transform:translateX(-50%);padding:9px 14px;background:var(--panel);border:1px solid var(--line);border-radius:999px;color:#a9c1d1;font-size:11px;white-space:nowrap;pointer-events:none}
+    .overlay{position:fixed;z-index:5;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(8,20,37,.62),rgba(4,10,19,.86));padding:20px}
+    .card{width:min(440px,100%);text-align:center;padding:34px 30px 28px;border:1px solid rgba(123,218,237,.25);border-radius:24px;background:linear-gradient(145deg,rgba(18,39,58,.97),rgba(8,18,31,.97));box-shadow:0 25px 90px #0008}
+    .eyebrow{font-size:10px;letter-spacing:.25em;color:var(--cyan);font-weight:800}.card h1{font-size:clamp(38px,9vw,62px);line-height:.98;margin:12px 0 12px;letter-spacing:-.06em}.card h1 span{color:var(--lime)}.card p{color:#aac0cf;line-height:1.55;font-size:14px;margin:0 auto 20px;max-width:340px}
+    .name-input{width:100%;padding:13px 15px;margin-bottom:12px;background:#071321;border:1px solid #315065;border-radius:11px;color:#fff;font-size:15px;outline:none}.name-input:focus{border-color:var(--cyan)}
+    button{border:0;border-radius:12px;background:linear-gradient(100deg,#67e9f4,#a6ff75);color:#08202a;font-size:15px;font-weight:900;padding:14px 20px;cursor:pointer;box-shadow:0 8px 28px #5ee7f733;transition:transform .15s,filter .15s}button:hover{filter:brightness(1.08);transform:translateY(-1px)}button:active{transform:translateY(1px)}.secondary{margin-top:10px;background:transparent;color:#a9c1d1;box-shadow:none;padding:9px 14px;font-size:12px}
+    .features{display:flex;justify-content:center;flex-wrap:wrap;gap:7px;margin:20px 0 0}.features span{font-size:10px;color:#c1d3df;padding:6px 9px;border:1px solid #294255;border-radius:99px;background:#102234}
+    .mobile-controls{display:none;position:fixed;z-index:3;inset:auto 18px 56px auto;pointer-events:none}.boost{pointer-events:auto;width:74px;height:74px;border-radius:50%;padding:0;background:linear-gradient(145deg,#ffc14f,#ff735c);color:#351508;font-size:12px;box-shadow:0 7px 25px #ff8a4c55}
+    .hidden{display:none!important}
+    @media(max-width:700px){.topbar{top:9px;left:9px;right:9px;flex-wrap:wrap}.brand{padding:8px 11px}.brand strong{font-size:12px}.brand small{font-size:8px}.stats{gap:10px;padding:8px 10px}.stat b{font-size:14px}.stat label{font-size:8px}.leaderboard{width:145px;padding:9px 10px}.leaderboard li{font-size:10px}.tip{font-size:9px;bottom:9px}.mobile-controls{display:block}.card{padding:28px 20px 23px}}
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Snake arcade game"></canvas>
+  <div class="topbar">
+    <div class="brand"><strong>SLITHER<span style="color:var(--lime)">CLASH</span></strong><small>BY C00LBOSS</small></div>
+    <div class="stats">
+      <div class="stat"><label>Mass</label><b id="score">0</b></div>
+      <div class="stat"><label>Best</label><b id="best">0</b></div>
+      <div class="stat"><label>Eliminations</label><b id="kills">0</b></div>
+    </div>
+    <div class="leaderboard"><h3>ARENA LEADERS</h3><ol id="leaders"></ol></div>
+  </div>
+  <div class="tip" id="tip">Move your mouse / finger to steer · Hold SPACE to boost · Don’t hit another snake!</div>
+  <div class="mobile-controls"><button class="boost" id="boost">BOOST</button></div>
+  <div class="overlay" id="overlay">
+    <div class="card">
+      <div class="eyebrow">A SNAKE ARCADE BY C00LBOSS</div>
+      <h1 id="title">SNAKE<br><span>CLASH</span></h1>
+      <p id="message">Eat glowing orbs, grow into the arena’s biggest snake, and outlast rival snakes. Boost to chase or escape—but it costs mass!</p>
+      <input class="name-input" id="playerName" maxlength="14" placeholder="Your snake name" value="Player" aria-label="Your snake name">
+      <button id="play">ENTER THE ARENA</button>
+      <div><button class="secondary" id="restart" hidden>Play again</button></div>
+      <div class="features"><span>⚡ Boost & chase</span><span>🐍 Rival bots</span><span>💥 Clash & collect</span></div>
+    </div>
+  </div>
+  <script>
+  (()=>{
+    'use strict';
+    const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+    const scoreEl=document.getElementById('score'),bestEl=document.getElementById('best'),killsEl=document.getElementById('kills'),leadersEl=document.getElementById('leaders');
+    const overlay=document.getElementById('overlay'),playBtn=document.getElementById('play'),restartBtn=document.getElementById('restart'),titleEl=document.getElementById('title'),messageEl=document.getElementById('message'),nameInput=document.getElementById('playerName'),boostBtn=document.getElementById('boost');
+    const W=2600,H=1900,FOOD_COUNT=190,BOT_COUNT=11,TAU=Math.PI*2;
+    let dpr=1,viewW=innerWidth,viewH=innerHeight,last=0,game=null,pointer={x:innerWidth/2,y:innerHeight/2,active:false},keys={};
+    let best=Number(localStorage.getItem('snake-clash-best')||0);bestEl.textContent=best;
+    const colors=['#ff7373','#61b5ff','#c47aff','#ffb74d','#ff70cf','#53e0bd','#f2dc59','#8f9bff','#ff8758','#5de4f0'];
+    function resize(){dpr=Math.min(devicePixelRatio||1,2);viewW=innerWidth;viewH=innerHeight;canvas.width=Math.floor(viewW*dpr);canvas.height=Math.floor(viewH*dpr);canvas.style.width=viewW+'px';canvas.style.height=viewH+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}
+    addEventListener('resize',resize);resize();
+    const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+    const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+    function makeSnake(name,x,y,color,isPlayer=false,size=0){const length=size||Math.floor(rand(9,17));const angle=rand(0,TAU);const parts=[];for(let i=0;i<length;i++)parts.push({x:x-Math.cos(angle)*i*13,y:y-Math.sin(angle)*i*13});return {name,x,y,angle,target:angle,color,isPlayer,parts,speed:isPlayer?190:rand(105,145),baseSpeed:isPlayer?190:rand(105,145),mass:length*10,kills:0,alive:true,think:0,boosting:false,blink:rand(0,TAU)}}
+    function start(){const playerName=(nameInput.value.trim()||'Player').slice(0,14);game={state:'playing',player:makeSnake(playerName,W/2,H/2,'#8eff69',true,14),bots:[],food:[],particles:[],camera:{x:W/2,y:H/2},lastFood:0,kills:0,elapsed:0};for(let i=0;i<BOT_COUNT;i++)spawnBot();for(let i=0;i<FOOD_COUNT;i++)spawnFood(rand(30,W-30),rand(30,H-30),colors[i%colors.length]);overlay.classList.add('hidden');playBtn.textContent='ENTER THE ARENA';restartBtn.hidden=true;last=performance.now();requestAnimationFrame(frame)}
+    function spawnBot(){if(!game)return;let x,y;do{x=rand(100,W-100);y=rand(100,H-100)}while(dist({x,y},game.player)>700);const bot=makeSnake(['Noodle','Zippy','Comet','Pickle','Mochi','Turbo','Wiggles','Ramen','Viper','Boba','Sizzle'][Math.floor(Math.random()*11)],x,y,colors[Math.floor(Math.random()*colors.length)]);game.bots.push(bot)}
+    function spawnFood(x=rand(25,W-25),y=rand(25,H-25),color=colors[Math.floor(Math.random()*colors.length)],value=1){game.food.push({x,y,color,value,phase:rand(0,TAU)})}
+    function angleDiff(a,b){return Math.atan2(Math.sin(b-a),Math.cos(b-a))}
+    function setTargetFromScreen(sx,sy){if(!game)return;const cx=game.camera.x+(sx-viewW/2),cy=game.camera.y+(sy-viewH/2);if(Math.hypot(cx-game.player.x,cy-game.player.y)>4)game.player.target=Math.atan2(cy-game.player.y,cx-game.player.x)}
+    function steerKey(){if(!game)return;let dx=0,dy=0;if(keys.ArrowUp||keys.w||keys.W)dy--;if(keys.ArrowDown||keys.s||keys.S)dy++;if(keys.ArrowLeft||keys.a||keys.A)dx--;if(keys.ArrowRight||keys.d||keys.D)dx++;if(dx||dy)game.player.target=Math.atan2(dy,dx)}
+    function updateSnake(s,dt,isPlayer){if(!s.alive)return;
+      if(!isPlayer){s.think-=dt;if(s.think<=0){s.think=rand(.45,1.3);let nearest=null,nd=Infinity;for(const f of game.food){const d=(f.x-s.x)**2+(f.y-s.y)**2;if(d<nd){nd=d;nearest=f}}if(nearest&&Math.random()<.77)s.target=Math.atan2(nearest.y-s.y,nearest.x-s.x);else s.target+=rand(-1.5,1.5);if(dist(s,game.player)<300&&Math.random()<.4)s.target=Math.atan2(s.y-game.player.y,s.x-game.player.x)+rand(-.5,.5)}}
+      const diff=angleDiff(s.angle,s.target),turn=(isPlayer?3.5:2.1)*dt;s.angle+=clamp(diff,-turn,turn);
+      let boosting=isPlayer?(keys.Space||keys.Shift||boostBtn.dataset.down==='1'):s.mass>130&&Math.abs(diff)<.45&&Math.random()<.015;
+      if(boosting&&s.mass>55){s.mass-=dt*15;s.speed=s.baseSpeed*1.52}else{s.speed=s.baseSpeed}
+      if(isPlayer)s.boosting=boosting&&s.mass>55;
+      const oldX=s.x,oldY=s.y;s.x+=Math.cos(s.angle)*s.speed*dt;s.y+=Math.sin(s.angle)*s.speed*dt;
+      const gap=13;const head=s.parts[0];head.x=s.x;head.y=s.y;
+      for(let i=1;i<s.parts.length;i++){const prev=s.parts[i-1],p=s.parts[i],dx=prev.x-p.x,dy=prev.y-p.y,d=Math.hypot(dx,dy);if(d>gap){const move=Math.min(d-gap,s.speed*dt*1.3);p.x+=dx/d*move;p.y+=dy/d*move}}
+      if(!isPlayer&&Math.random()<.025&&dist(s,game.player)<270)s.target=Math.atan2(game.player.y-s.y,game.player.x-s.x)+rand(-1,1);
+      if(isPlayer){game.camera.x+=(s.x-game.camera.x)*Math.min(1,dt*4);game.camera.y+=(s.y-game.camera.y)*Math.min(1,dt*4)}
+      if(s.x<22||s.y<22||s.x>W-22||s.y>H-22){if(isPlayer)endGame('You hit the arena wall.');else killBot(s)}
+      if(!s.alive)return;
+      for(let i=0;i<game.food.length;i++){const f=game.food[i];if((s.x-f.x)**2+(s.y-f.y)**2<400){s.mass+=f.value*2.7;if(s.parts.length<Math.floor(s.mass/10))s.parts.push({...s.parts[s.parts.length-1]});game.food.splice(i,1);spawnFood(f.x+rand(-12,12),f.y+rand(-12,12),f.color,1);break}}
+    }
+    function killBot(bot){if(!bot.alive)return;bot.alive=false;for(let i=0;i<Math.min(13,Math.ceil(bot.parts.length/2));i++){const p=bot.parts[Math.min(bot.parts.length-1,i*2)];spawnFood(p.x+rand(-12,12),p.y+rand(-12,12),bot.color,2)}if(game.bots.filter(b=>b.alive).length<BOT_COUNT)setTimeout(()=>{if(game&&game.state==='playing')spawnBot()},1200)}
+    function collide(){const p=game.player;for(const b of game.bots){if(!b.alive)continue;for(let i=2;i<b.parts.length;i++){if((p.x-b.parts[i].x)**2+(p.y-b.parts[i].y)**2<14**2){killBot(b);p.kills++;game.kills++;for(let j=0;j<Math.min(12,b.parts.length);j+=2){const q=b.parts[j];spawnFood(q.x,q.y,b.color,2)}break}}}
+      for(const b of game.bots){if(!b.alive)continue;for(let i=2;i<p.parts.length;i++){if((b.x-p.parts[i].x)**2+(b.y-p.parts[i].y)**2<12**2){killBot(b);break}}}
+      for(let i=3;i<p.parts.length;i++){if((p.x-p.parts[i].x)**2+(p.y-p.parts[i].y)**2<10**2){endGame('You tangled with yourself.');return}}
+      for(const b of game.bots){if(!b.alive)continue;for(const other of game.bots){if(!other.alive||other===b)continue;for(let i=2;i<other.parts.length;i++){if((b.x-other.parts[i].x)**2+(b.y-other.parts[i].y)**2<12**2){killBot(b);break}}}}
+    }
+    function update(dt){if(!game||game.state!=='playing')return;game.elapsed+=dt;steerKey();const p=game.player;updateSnake(p,dt,true);for(const b of game.bots)updateSnake(b,dt,false);collide();if(game.state!=='playing')return;game.particles=game.particles.filter(q=>(q.life-=dt)>0);if(game.food.length<FOOD_COUNT)spawnFood();scoreEl.textContent=Math.floor(p.mass);killsEl.textContent=game.kills;best=Math.max(best,Math.floor(p.mass));bestEl.textContent=best;localStorage.setItem('snake-clash-best',String(best));updateLeaders()}
+    function updateLeaders(){if(!game)return;const all=[game.player,...game.bots.filter(b=>b.alive)].sort((a,b)=>b.mass-a.mass).slice(0,5);leadersEl.innerHTML=all.map((s,i)=>`<li class="${s.isPlayer?'you':''}"><span>${i+1}. ${escapeHtml(s.name)}${s.isPlayer?' ★':''}</span><b>${Math.floor(s.mass)}</b></li>`).join('')}
+    function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+    function drawSnake(s){if(!s.alive||s.parts.length<1)return;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';if(s.boosting){ctx.shadowColor=s.color;ctx.shadowBlur=22}ctx.strokeStyle=s.color;ctx.lineWidth=20;ctx.beginPath();ctx.moveTo(s.parts[0].x,s.parts[0].y);for(let i=1;i<s.parts.length;i++)ctx.lineTo(s.parts[i].x,s.parts[i].y);ctx.stroke();ctx.shadowBlur=0;ctx.fillStyle=s.isPlayer?'#ddffb2':'#fff';ctx.beginPath();ctx.arc(s.x,s.y,10,0,TAU);ctx.fill();const ex=Math.cos(s.angle),ey=Math.sin(s.angle),sideX=-ey,sideY=ex;for(const side of [-1,1]){ctx.fillStyle='#142332';ctx.beginPath();ctx.arc(s.x+ex*4+sideX*5,s.y+ey*4+sideY*5,2.4,0,TAU);ctx.fill()}ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.fillStyle='#eaf6ff';ctx.shadowColor='#06111d';ctx.shadowBlur=5;ctx.fillText(s.name,s.x,s.y-19);ctx.restore()}
+    function draw(){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,viewW,viewH);if(!game){drawBackdrop();return}const cam=game.camera;ctx.save();ctx.translate(viewW/2-cam.x,viewH/2-cam.y);drawBackdropWorld();ctx.save();ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();for(const f of game.food){const pulse=1+Math.sin(game.elapsed*4+f.phase)*.18;ctx.fillStyle=f.color;ctx.shadowColor=f.color;ctx.shadowBlur=13;ctx.beginPath();ctx.arc(f.x,f.y,(3.5+f.value*.7)*pulse,0,TAU);ctx.fill();ctx.shadowBlur=0}for(const b of game.bots)drawSnake(b);drawSnake(game.player);ctx.restore();ctx.restore();drawMinimap()}
+    function drawBackdrop(){ctx.fillStyle='#081321';ctx.fillRect(0,0,viewW,viewH);ctx.strokeStyle='rgba(78,133,164,.10)';ctx.lineWidth=1;const step=48,ox=(viewW/2)%step,oy=(viewH/2)%step;for(let x=ox;x<viewW;x+=step){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,viewH);ctx.stroke()}for(let y=oy;y<viewH;y+=step){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(viewW,y);ctx.stroke()}}
+    function drawBackdropWorld(){ctx.fillStyle='#081321';ctx.fillRect(0,0,W,H);ctx.strokeStyle='rgba(78,133,164,.13)';ctx.lineWidth=1;for(let x=0;x<=W;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<=H;y+=48){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}ctx.strokeStyle='#ff5d70';ctx.lineWidth=8;ctx.shadowColor='#ff5d70';ctx.shadowBlur=18;ctx.strokeRect(4,4,W-8,H-8);ctx.shadowBlur=0}
+    function drawMinimap(){if(!game)return;const w=94,h=68,x=viewW-112,y=viewH-91;ctx.save();ctx.globalAlpha=.88;ctx.fillStyle='#07111fe8';ctx.strokeStyle='#84bdd266';ctx.lineWidth=1;roundRect(ctx,x,y,w,h,8);ctx.fill();ctx.stroke();ctx.fillStyle='#ff5c68';ctx.fillRect(x+5,y+5,w-10,1);ctx.fillRect(x+5,y+h-6,w-10,1);for(const b of game.bots){if(!b.alive)continue;ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(x+b.x/W*w,y+b.y/H*h,1.8,0,TAU);ctx.fill()}ctx.fillStyle='#a7ff72';ctx.beginPath();ctx.arc(x+game.player.x/W*w,y+game.player.y/H*h,3,0,TAU);ctx.fill();ctx.restore()}
+    function roundRect(c,x,y,w,h,r){c.beginPath();c.roundRect(x,y,w,h,r)}
+    function frame(t){if(!game||game.state!=='playing')return;const dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);draw();if(game&&game.state==='playing')requestAnimationFrame(frame)}
+    function endGame(reason){if(!game||game.state!=='playing')return;game.state='over';overlay.classList.remove('hidden');titleEl.innerHTML='GAME<br><span>OVER</span>';messageEl.textContent=`${reason} You reached ${Math.floor(game.player.mass)} mass and ${game.kills} eliminations.`;playBtn.textContent='TRY AGAIN';restartBtn.hidden=false;nameInput.value=game.player.name}
+    playBtn.addEventListener('click',start);restartBtn.addEventListener('click',start);nameInput.addEventListener('keydown',e=>{if(e.key==='Enter')start()});
+    addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift'].includes(e.key))e.preventDefault();keys[e.key]=true;if(e.key==='Escape'&&game&&game.state==='playing'){game.state='paused';overlay.classList.remove('hidden');titleEl.innerHTML='PAUSED';messageEl.textContent='Catch your breath. The arena is waiting.';playBtn.textContent='RESUME';restartBtn.hidden=false;playBtn.onclick=()=>{playBtn.onclick=null;start()}}});
+    addEventListener('keyup',e=>{keys[e.key]=false});
+    canvas.addEventListener('pointermove',e=>{pointer={x:e.clientX,y:e.clientY,active:true};if(game&&game.state==='playing')setTargetFromScreen(e.clientX,e.clientY)});
+    canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'){pointer={x:e.clientX,y:e.clientY,active:true};setTargetFromScreen(e.clientX,e.clientY)}});
+    boostBtn.addEventListener('pointerdown',e=>{e.preventDefault();boostBtn.dataset.down='1'});for(const ev of ['pointerup','pointercancel','pointerleave'])boostBtn.addEventListener(ev,()=>boostBtn.dataset.down='0');
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.Space=false});
+    draw();
+  })();
+  </script>
+</body>
+</html>
