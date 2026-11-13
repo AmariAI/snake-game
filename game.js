@@ -51,8 +51,17 @@
       player: makeSnake(name, WORLD_W / 2, WORLD_H / 2, '#a5ff72', true),
       bots: [], food: [], camera: { x: WORLD_W / 2, y: WORLD_H / 2 }, kills: 0, elapsed: 0
     };
+    // Keep bots away from the player at spawn so a random placement cannot cause an instant collision.
     const botNames = ['Noodle', 'Zippy', 'Comet', 'Pickle', 'Mochi', 'Turbo', 'Wiggles', 'Ramen', 'Viper', 'Boba', 'Sizzle'];
-    botNames.forEach((botName, i) => game.bots.push(makeSnake(botName, rand(100, WORLD_W - 100), rand(100, WORLD_H - 100), colors[i % colors.length])));
+    botNames.forEach((botName, i) => {
+      let x, y, attempts = 0;
+      do {
+        x = rand(100, WORLD_W - 100);
+        y = rand(100, WORLD_H - 100);
+        attempts++;
+      } while (Math.hypot(x - WORLD_W / 2, y - WORLD_H / 2) < 450 && attempts < 100);
+      game.bots.push(makeSnake(botName, x, y, colors[i % colors.length]));
+    });
     for (let i = 0; i < 210; i++) addFood();
     overlay.classList.add('hidden');
     pauseButton.disabled = false;
@@ -142,14 +151,17 @@
         if (distance2(player, bot.parts[i]) < 15 * 15) { eliminate(bot); player.mass += 14; break; }
       }
     }
+    // Give the player a brief start grace period and ignore the nearest body segments,
+    // avoiding unfair deaths while the snake is still short and turning out of spawn.
+    if (game.elapsed < 3) return;
     for (const bot of game.bots) {
       if (!bot.alive) continue;
-      for (let i = 3; i < player.parts.length; i++) {
-        if (distance2(bot, player.parts[i]) < 15 * 15) { end('A rival caught you.'); return; }
+      for (let i = 8; i < player.parts.length; i++) {
+        if (distance2(bot, player.parts[i]) < 13 * 13) { end('A rival caught you.'); return; }
       }
     }
-    for (let i = 5; i < player.parts.length; i++) {
-      if (distance2(player, player.parts[i]) < 12 * 12) { end('You tangled with yourself.'); return; }
+    for (let i = 9; i < player.parts.length; i++) {
+      if (distance2(player, player.parts[i]) < 10 * 10) { end('You tangled with yourself.'); return; }
     }
   }
 
