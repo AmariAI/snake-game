@@ -21,4 +21,10 @@ function draw(){if(!game){ctx.fillStyle='#081421';ctx.fillRect(0,0,w,h);return}c
 function frame(t){if(!game||game.state!=='playing')return;const dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);draw();if(game&&game.state==='playing')requestAnimationFrame(frame)}
 startButton.addEventListener('click',start);nameInput.addEventListener('keydown',e=>{if(e.key==='Enter')start()});pauseButton.addEventListener('click',()=>togglePause());function togglePause(){if(!game)return;if(game.state==='playing'){game.state='paused';overlay.classList.remove('hidden');document.getElementById('overlay-title').innerHTML='Take a <span>breather.</span>';document.getElementById('overlay-message').textContent='Your run is paused. Jump back into the arena when you’re ready.';startButton.innerHTML='Resume run <span>→</span>';pauseButton.innerHTML='Resume <kbd>SPACE</kbd>'}else if(game.state==='paused'){game.state='playing';overlay.classList.add('hidden');pauseButton.innerHTML='Pause <kbd>SPACE</kbd>';last=performance.now();requestAnimationFrame(frame)}}
 addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift'].includes(e.key))e.preventDefault();keys[e.key]=true;if(e.code==='Space'&&game&&game.state==='paused')togglePause()});addEventListener('keyup',e=>keys[e.key]=false);canvas.addEventListener('pointermove',e=>{if(game&&game.state==='playing')setTarget(e.clientX,e.clientY)});canvas.addEventListener('pointerdown',e=>{if(game&&game.state==='playing')setTarget(e.clientX,e.clientY)});mobileBoost.addEventListener('pointerdown',e=>{e.preventDefault();mobileBoost.dataset.down='1'});['pointerup','pointercancel','pointerleave'].forEach(ev=>mobileBoost.addEventListener(ev,()=>mobileBoost.dataset.down='0'));document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.Space=false});draw();
-})();
+})():
+<script src="global-leaderboard.js"></script>
+<script src="game.js"></script>
+<script src="global-leaderboard.js"></script>
+</body>
+game.state = 'over';
+window.SnakeLeaderboard?.submit(game.player.name, Math.floor(game.player.mass));
