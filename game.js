@@ -1,30 +1,273 @@
-(()=>{'use strict';
-const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');const scoreEl=document.getElementById('score'),bestEl=document.getElementById('best'),killsEl=document.getElementById('kills'),leaderboard=document.getElementById('leaderboard'),overlay=document.getElementById('overlay'),startButton=document.getElementById('start-button'),pauseButton=document.getElementById('pause-button'),nameInput=document.getElementById('player-name'),statusEl=document.getElementById('game-status'),mobileBoost=document.getElementById('mobile-boost');
-const colors=['#ff7179','#5ab9ff','#c57cff','#ffb35d','#ff70ce','#53dfb9','#e9df56','#929bff','#ff8758','#55dff2'];let dpr=1,w=0,h=0,game=null,last=0,keys={},pointer={x:0,y:0};let best=Number(localStorage.getItem('snake-clash-best')||0);bestEl.textContent=best;
-const rand=(a,b)=>a+Math.random()*(b-a),clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),angleDiff=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a)),TAU=Math.PI*2;
-function resize(){const r=canvas.getBoundingClientRect();dpr=Math.min(devicePixelRatio||1,2);w=r.width;h=r.height;canvas.width=Math.max(1,Math.floor(w*dpr));canvas.height=Math.max(1,Math.floor(h*dpr));ctx.setTransform(dpr,0,0,dpr,0,0)}new ResizeObserver(resize).observe(canvas);resize();
-function newSnake(name,x,y,color,player=false){const n=12,parts=[];for(let i=0;i<n;i++)parts.push({x:x-i*12,y});return{name,x,y,angle:0,target:0,color,player,parts,mass:n*10,speed:player?155:rand(100,130),alive:true,think:0,boosting:false}}
-function start(){const name=(nameInput.value.trim()||'Player').slice(0,14);game={state:'playing',player:newSnake(name,1300,950,'#a5ff72',true),bots:[],food:[],camera:{x:1300,y:950},kills:0,elapsed:0};for(let i=0;i<11;i++){let x,y;do{x=rand(130,2470);y=rand(130,1770)}while(Math.hypot(x-1300,y-950)<300);game.bots.push(newSnake(['Noodle','Zippy','Comet','Pickle','Mochi','Turbo','Wiggles','Ramen','Viper','Boba','Sizzle'][i],x,y,colors[i%colors.length]))}for(let i=0;i<210;i++)food();overlay.classList.add('hidden');pauseButton.disabled=false;pauseButton.innerHTML='Pause <kbd>SPACE</kbd>';statusEl.textContent='Mouse / finger to steer · WASD or arrows · Space / Shift to boost';last=performance.now();requestAnimationFrame(frame)}
-function food(x=rand(25,2575),y=rand(25,1875),color=colors[Math.floor(Math.random()*colors.length)],value=1){game.food.push({x,y,color,value,phase:rand(0,TAU)})}
-function end(reason){if(!game||game.state!=='playing')return;game.state='over';overlay.classList.remove('hidden');document.getElementById('overlay-title').innerHTML='Run <span>over.</span>';document.getElementById('overlay-message').textContent=`${reason} You reached ${Math.floor(game.player.mass)} mass and ${game.kills} eliminations.`;startButton.innerHTML='Play again <span>→</span>';pauseButton.disabled=true}
-function setTarget(clientX,clientY){if(!game)return;const rect=canvas.getBoundingClientRect(),sx=clientX-rect.left,sy=clientY-rect.top,dx=game.camera.x+(sx-w/2)-game.player.x,dy=game.camera.y+(sy-h/2)-game.player.y;if(Math.hypot(dx,dy)>3)game.player.target=Math.atan2(dy,dx)}
-function updateSnake(s,dt,isPlayer){if(!s.alive)return;if(!isPlayer){s.think-=dt;if(s.think<=0){s.think=rand(.5,1.3);let f=null,dd=Infinity;for(const q of game.food){const d=(q.x-s.x)**2+(q.y-s.y)**2;if(d<dd){dd=d;f=q}}if(f&&Math.random()<.8)s.target=Math.atan2(f.y-s.y,f.x-s.x);else s.target+=rand(-1.7,1.7);if(Math.random()<.25)s.target=Math.atan2(s.y-game.player.y,s.x-game.player.x)}}
-const d=angleDiff(s.angle,s.target),turn=(isPlayer?3.5:2.2)*dt;s.angle+=clamp(d,-turn,turn);let boost=isPlayer?(keys.Space||keys.Shift||mobileBoost.dataset.down==='1'):(s.mass>140&&Math.abs(d)<.4&&Math.random()<.02);s.boosting=boost&&s.mass>55;if(s.boosting){s.mass-=dt*12;s.speed=(isPlayer?155:115)*1.48}else s.speed=isPlayer?155:115;s.x+=Math.cos(s.angle)*s.speed*dt;s.y+=Math.sin(s.angle)*s.speed*dt;s.parts[0].x=s.x;s.parts[0].y=s.y;for(let i=1;i<s.parts.length;i++){const a=s.parts[i-1],b=s.parts[i],dx=a.x-b.x,dy=a.y-b.y,distance=Math.hypot(dx,dy);if(distance>12){const m=Math.min(distance-12,s.speed*dt*1.35);b.x+=dx/distance*m;b.y+=dy/distance*m}}
-if(s.x<22||s.y<22||s.x>2578||s.y>1878){if(isPlayer)end('You hit the arena wall.');else eliminate(s);return}for(let i=0;i<game.food.length;i++){const f=game.food[i];if((s.x-f.x)**2+(s.y-f.y)**2<350){s.mass+=f.value*2.7;if(s.parts.length<Math.floor(s.mass/10))s.parts.push({...s.parts[s.parts.length-1]});game.food.splice(i,1);food(f.x+rand(-10,10),f.y+rand(-10,10),f.color);break}}}
-function eliminate(s){if(!s.alive)return;s.alive=false;for(let i=1;i<s.parts.length;i+=2){const p=s.parts[i];food(p.x,p.y,s.color,2)}if(s.player)game.kills++}
-function collisions(){const p=game.player;for(const b of game.bots){if(!b.alive)continue;for(let i=2;i<b.parts.length;i++)if((p.x-b.parts[i].x)**2+(p.y-b.parts[i].y)**2<180){eliminate(b);p.mass+=14;break}}for(const b of game.bots){if(!b.alive)continue;for(let i=3;i<p.parts.length;i++)if((b.x-p.parts[i].x)**2+(b.y-p.parts[i].y)**2<160){eliminate(b);break}}for(let i=4;i<p.parts.length;i++)if((p.x-p.parts[i].x)**2+(p.y-p.parts[i].y)**2<100){end('You tangled with yourself.');return}for(const b of game.bots){if(!b.alive)continue;for(const other of game.bots){if(!other.alive||other===b)continue;for(let i=2;i<other.parts.length;i++)if((b.x-other.parts[i].x)**2+(b.y-other.parts[i].y)**2<150){eliminate(b);break}}}}
-function update(dt){if(!game||game.state!=='playing')return;game.elapsed+=dt;const p=game.player;let dx=0,dy=0;if(keys.ArrowUp||keys.w||keys.W)dy--;if(keys.ArrowDown||keys.s||keys.S)dy++;if(keys.ArrowLeft||keys.a||keys.A)dx--;if(keys.ArrowRight||keys.d||keys.D)dx++;if(dx||dy)p.target=Math.atan2(dy,dx);updateSnake(p,dt,true);game.bots.forEach(b=>updateSnake(b,dt,false));collisions();if(game.state!=='playing')return;while(game.food.length<210)food();game.camera.x+=(p.x-game.camera.x)*Math.min(1,dt*4);game.camera.y+=(p.y-game.camera.y)*Math.min(1,dt*4);scoreEl.textContent=Math.floor(p.mass);killsEl.textContent=game.kills;best=Math.max(best,Math.floor(p.mass));bestEl.textContent=best;localStorage.setItem('snake-clash-best',String(best));showLeaders()}
-function showLeaders(){const all=[game.player,...game.bots.filter(b=>b.alive)].sort((a,b)=>b.mass-a.mass).slice(0,5);leaderboard.innerHTML=all.map((s,i)=>`<li class="${s.player?'you':''}"><span>${i+1}. ${escapeText(s.name)}${s.player?' ★':''}</span><b>${Math.floor(s.mass)}</b></li>`).join('')}
-function escapeText(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function drawSnake(s){if(!s.alive)return;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=s.color;ctx.lineWidth=18;if(s.boosting){ctx.shadowColor=s.color;ctx.shadowBlur=18}ctx.beginPath();ctx.moveTo(s.parts[0].x,s.parts[0].y);for(let i=1;i<s.parts.length;i++)ctx.lineTo(s.parts[i].x,s.parts[i].y);ctx.stroke();ctx.shadowBlur=0;ctx.fillStyle='#f0ffd7';ctx.beginPath();ctx.arc(s.x,s.y,9,0,TAU);ctx.fill();const ex=Math.cos(s.angle),ey=Math.sin(s.angle),px=-ey,py=ex;ctx.fillStyle='#13222b';for(const side of [-1,1]){ctx.beginPath();ctx.arc(s.x+ex*4+px*4*side,s.y+ey*4+py*4*side,2,0,TAU);ctx.fill()}ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillStyle='#eff7fa';ctx.shadowColor='#07111f';ctx.shadowBlur=5;ctx.fillText(s.name,s.x,s.y-17);ctx.restore()}
-function draw(){if(!game){ctx.fillStyle='#081421';ctx.fillRect(0,0,w,h);return}ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);const c=game.camera;ctx.save();ctx.translate(w/2-c.x,h/2-c.y);ctx.fillStyle='#081421';ctx.fillRect(0,0,2600,1900);ctx.strokeStyle='#4b71851c';ctx.lineWidth=1;for(let x=0;x<=2600;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,1900);ctx.stroke()}for(let y=0;y<=1900;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(2600,y);ctx.stroke()}ctx.strokeStyle='#ff6674';ctx.lineWidth=7;ctx.shadowColor='#ff6674';ctx.shadowBlur=17;ctx.strokeRect(4,4,2592,1892);ctx.shadowBlur=0;ctx.beginPath();ctx.rect(0,0,2600,1900);ctx.clip();for(const f of game.food){ctx.fillStyle=f.color;ctx.shadowColor=f.color;ctx.shadowBlur=11;ctx.beginPath();ctx.arc(f.x,f.y,(3.4+f.value*.7)*(1+Math.sin(game.elapsed*4+f.phase)*.15),0,TAU);ctx.fill()}ctx.shadowBlur=0;game.bots.forEach(drawSnake);drawSnake(game.player);ctx.restore()}
-function frame(t){if(!game||game.state!=='playing')return;const dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);draw();if(game&&game.state==='playing')requestAnimationFrame(frame)}
-startButton.addEventListener('click',start);nameInput.addEventListener('keydown',e=>{if(e.key==='Enter')start()});pauseButton.addEventListener('click',()=>togglePause());function togglePause(){if(!game)return;if(game.state==='playing'){game.state='paused';overlay.classList.remove('hidden');document.getElementById('overlay-title').innerHTML='Take a <span>breather.</span>';document.getElementById('overlay-message').textContent='Your run is paused. Jump back into the arena when you’re ready.';startButton.innerHTML='Resume run <span>→</span>';pauseButton.innerHTML='Resume <kbd>SPACE</kbd>'}else if(game.state==='paused'){game.state='playing';overlay.classList.add('hidden');pauseButton.innerHTML='Pause <kbd>SPACE</kbd>';last=performance.now();requestAnimationFrame(frame)}}
-addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift'].includes(e.key))e.preventDefault();keys[e.key]=true;if(e.code==='Space'&&game&&game.state==='paused')togglePause()});addEventListener('keyup',e=>keys[e.key]=false);canvas.addEventListener('pointermove',e=>{if(game&&game.state==='playing')setTarget(e.clientX,e.clientY)});canvas.addEventListener('pointerdown',e=>{if(game&&game.state==='playing')setTarget(e.clientX,e.clientY)});mobileBoost.addEventListener('pointerdown',e=>{e.preventDefault();mobileBoost.dataset.down='1'});['pointerup','pointercancel','pointerleave'].forEach(ev=>mobileBoost.addEventListener(ev,()=>mobileBoost.dataset.down='0'));document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.Space=false});draw();
-})():
-<script src="global-leaderboard.js"></script>
-<script src="game.js"></script>
-<script src="global-leaderboard.js"></script>
-</body>
-game.state = 'over';
-window.SnakeLeaderboard?.submit(game.player.name, Math.floor(game.player.mass));
+(() => {
+  'use strict';
+
+  const canvas = document.getElementById('game');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const $ = (id) => document.getElementById(id);
+  const scoreEl = $('score'), bestEl = $('best'), killsEl = $('kills');
+  const leaderboard = $('leaderboard'), overlay = $('overlay');
+  const startButton = $('start-button'), pauseButton = $('pause-button');
+  const nameInput = $('player-name'), statusEl = $('game-status');
+  const mobileBoost = $('mobile-boost');
+  const colors = ['#ff7179', '#5ab9ff', '#c57cff', '#ffb35d', '#ff70ce', '#53dfb9', '#e9df56', '#929bff'];
+  const WORLD_W = 2600, WORLD_H = 1900;
+  let width = 0, height = 0, dpr = 1, game = null, lastTime = 0;
+  const keys = Object.create(null);
+
+  let best = Number(localStorage.getItem('snake-clash-best') || 0);
+  if (bestEl) bestEl.textContent = best;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = rect.width;
+    height = rect.height;
+    canvas.width = Math.max(1, Math.floor(width * dpr));
+    canvas.height = Math.max(1, Math.floor(height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  new ResizeObserver(resize).observe(canvas);
+
+  const rand = (min, max) => min + Math.random() * (max - min);
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  const distance2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+
+  function makeSnake(name, x, y, color, player = false) {
+    const parts = [];
+    for (let i = 0; i < 12; i++) parts.push({ x: x - i * 12, y });
+    return { name, x, y, angle: 0, target: 0, color, player, parts, mass: 120, alive: true, think: 0 };
+  }
+
+  function addFood(x = rand(30, WORLD_W - 30), y = rand(30, WORLD_H - 30), color = colors[Math.floor(Math.random() * colors.length)], value = 1) {
+    game.food.push({ x, y, color, value, phase: rand(0, Math.PI * 2) });
+  }
+
+  function start() {
+    const name = (nameInput.value.trim() || 'Player').slice(0, 14);
+    game = {
+      state: 'playing',
+      player: makeSnake(name, WORLD_W / 2, WORLD_H / 2, '#a5ff72', true),
+      bots: [], food: [], camera: { x: WORLD_W / 2, y: WORLD_H / 2 }, kills: 0, elapsed: 0
+    };
+    const botNames = ['Noodle', 'Zippy', 'Comet', 'Pickle', 'Mochi', 'Turbo', 'Wiggles', 'Ramen', 'Viper', 'Boba', 'Sizzle'];
+    botNames.forEach((botName, i) => game.bots.push(makeSnake(botName, rand(100, WORLD_W - 100), rand(100, WORLD_H - 100), colors[i % colors.length])));
+    for (let i = 0; i < 210; i++) addFood();
+    overlay.classList.add('hidden');
+    pauseButton.disabled = false;
+    pauseButton.innerHTML = 'Pause <kbd>SPACE</kbd>';
+    statusEl.textContent = 'Move mouse / finger to steer · WASD or arrows also work';
+    lastTime = performance.now();
+    requestAnimationFrame(frame);
+  }
+
+  function end(reason) {
+    if (!game || game.state !== 'playing') return;
+    game.state = 'over';
+    const finalScore = Math.floor(game.player.mass);
+    best = Math.max(best, finalScore);
+    bestEl.textContent = best;
+    localStorage.setItem('snake-clash-best', String(best));
+    if (window.SnakeLeaderboard?.submitScore) {
+      window.SnakeLeaderboard.submitScore(game.player.name, finalScore);
+    }
+    overlay.classList.remove('hidden');
+    $('overlay-title').innerHTML = 'Run <span>over.</span>';
+    $('overlay-message').textContent = `${reason} You reached ${finalScore} mass and ${game.kills} eliminations.`;
+    startButton.innerHTML = 'Play again <span>↗</span>';
+    pauseButton.disabled = true;
+  }
+
+  function steerTo(clientX, clientY) {
+    if (!game || game.state !== 'playing') return;
+    const rect = canvas.getBoundingClientRect();
+    const targetX = game.camera.x + (clientX - rect.left - width / 2);
+    const targetY = game.camera.y + (clientY - rect.top - height / 2);
+    game.player.target = Math.atan2(targetY - game.player.y, targetX - game.player.x);
+  }
+
+  function moveSnake(snake, dt, isPlayer) {
+    if (!snake.alive) return;
+    if (!isPlayer) {
+      snake.think -= dt;
+      if (snake.think <= 0) {
+        snake.think = rand(.5, 1.3);
+        let nearest = null, nearestD = Infinity;
+        for (const food of game.food) {
+          const d = distance2(snake, food);
+          if (d < nearestD) { nearestD = d; nearest = food; }
+        }
+        if (nearest) snake.target = Math.atan2(nearest.y - snake.y, nearest.x - snake.x);
+      }
+    }
+    let diff = Math.atan2(Math.sin(snake.target - snake.angle), Math.cos(snake.target - snake.angle));
+    snake.angle += clamp(diff, -3.2 * dt, 3.2 * dt);
+    const boosting = isPlayer && (keys.Space || keys.Shift || mobileBoost?.dataset.down === '1') && snake.mass > 60;
+    const speed = (boosting ? 220 : 155) * (isPlayer ? 1 : .72);
+    if (boosting) snake.mass = Math.max(60, snake.mass - dt * 12);
+    snake.x += Math.cos(snake.angle) * speed * dt;
+    snake.y += Math.sin(snake.angle) * speed * dt;
+    snake.parts.unshift({ x: snake.x, y: snake.y });
+    const desiredParts = Math.max(12, Math.floor(snake.mass / 10));
+    while (snake.parts.length > desiredParts) snake.parts.pop();
+
+    if (snake.x < 22 || snake.y < 22 || snake.x > WORLD_W - 22 || snake.y > WORLD_H - 22) {
+      if (isPlayer) end('You hit the arena wall.'); else eliminate(snake);
+      return;
+    }
+    for (let i = 0; i < game.food.length; i++) {
+      const food = game.food[i];
+      if (distance2(snake, food) < 20 * 20) {
+        snake.mass += food.value * 2.7;
+        game.food.splice(i, 1);
+        addFood(food.x + rand(-10, 10), food.y + rand(-10, 10), food.color);
+        break;
+      }
+    }
+  }
+
+  function eliminate(snake) {
+    if (!snake.alive) return;
+    snake.alive = false;
+    for (let i = 2; i < snake.parts.length; i += 3) addFood(snake.parts[i].x, snake.parts[i].y, snake.color, 2);
+    if (snake.player) game.kills++;
+  }
+
+  function collisions() {
+    const player = game.player;
+    for (const bot of game.bots) {
+      if (!bot.alive) continue;
+      for (let i = 3; i < bot.parts.length; i++) {
+        if (distance2(player, bot.parts[i]) < 15 * 15) { eliminate(bot); player.mass += 14; break; }
+      }
+    }
+    for (const bot of game.bots) {
+      if (!bot.alive) continue;
+      for (let i = 3; i < player.parts.length; i++) {
+        if (distance2(bot, player.parts[i]) < 15 * 15) { end('A rival caught you.'); return; }
+      }
+    }
+    for (let i = 5; i < player.parts.length; i++) {
+      if (distance2(player, player.parts[i]) < 12 * 12) { end('You tangled with yourself.'); return; }
+    }
+  }
+
+  function update(dt) {
+    if (!game || game.state !== 'playing') return;
+    game.elapsed += dt;
+    const p = game.player;
+    let dx = 0, dy = 0;
+    if (keys.ArrowUp || keys.w || keys.W) dy--;
+    if (keys.ArrowDown || keys.s || keys.S) dy++;
+    if (keys.ArrowLeft || keys.a || keys.A) dx--;
+    if (keys.ArrowRight || keys.d || keys.D) dx++;
+    if (dx || dy) p.target = Math.atan2(dy, dx);
+    moveSnake(p, dt, true);
+    game.bots.forEach(bot => moveSnake(bot, dt, false));
+    collisions();
+    if (game.state !== 'playing') return;
+    while (game.food.length < 210) addFood();
+    game.camera.x += (p.x - game.camera.x) * Math.min(1, dt * 4);
+    game.camera.y += (p.y - game.camera.y) * Math.min(1, dt * 4);
+    scoreEl.textContent = Math.floor(p.mass);
+    killsEl.textContent = game.kills;
+    best = Math.max(best, Math.floor(p.mass));
+    bestEl.textContent = best;
+    localStorage.setItem('snake-clash-best', String(best));
+    showLeaders();
+  }
+
+  function showLeaders() {
+    const entries = [game.player, ...game.bots.filter(bot => bot.alive)]
+      .sort((a, b) => b.mass - a.mass).slice(0, 5);
+    leaderboard.innerHTML = entries.map((snake, i) =>
+      `<li class="${snake.player ? 'you' : ''}"><span>${i + 1}. ${escapeText(snake.name)}${snake.player ? ' (you)' : ''}</span><b>${Math.floor(snake.mass)}</b></li>`
+    ).join('');
+  }
+  function escapeText(text) {
+    return String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  function drawSnake(snake) {
+    if (!snake.alive || !snake.parts.length) return;
+    ctx.beginPath();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = snake.color; ctx.lineWidth = 17;
+    for (let i = 0; i < snake.parts.length; i++) {
+      const part = snake.parts[i];
+      if (i === 0) ctx.moveTo(part.x, part.y); else ctx.lineTo(part.x, part.y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#f0ffd7';
+    ctx.beginPath(); ctx.arc(snake.x, snake.y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#13222b';
+    ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(snake.name, snake.x, snake.y - 17);
+  }
+
+  function draw() {
+    if (!ctx || !width || !height) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#081421'; ctx.fillRect(0, 0, width, height);
+    if (!game) return;
+    ctx.save();
+    ctx.translate(width / 2 - game.camera.x, height / 2 - game.camera.y);
+    ctx.fillStyle = '#081421'; ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+    ctx.strokeStyle = 'rgba(75,113,133,.25)'; ctx.lineWidth = 1;
+    for (let x = 0; x <= WORLD_W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_H); ctx.stroke(); }
+    for (let y = 0; y <= WORLD_H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_W, y); ctx.stroke(); }
+    ctx.strokeStyle = '#ff6674'; ctx.lineWidth = 7; ctx.strokeRect(4, 4, WORLD_W - 8, WORLD_H - 8);
+    for (const food of game.food) {
+      ctx.fillStyle = food.color; ctx.shadowColor = food.color; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(food.x, food.y, 3.4 + food.value * .7, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    game.bots.forEach(drawSnake); drawSnake(game.player);
+    ctx.restore();
+  }
+
+  function frame(time) {
+    if (!game || game.state !== 'playing') return;
+    const dt = Math.min(.04, (time - lastTime) / 1000 || 0);
+    lastTime = time;
+    update(dt); draw();
+    if (game && game.state === 'playing') requestAnimationFrame(frame);
+  }
+
+  function togglePause() {
+    if (!game) return;
+    if (game.state === 'playing') {
+      game.state = 'paused'; overlay.classList.remove('hidden');
+      $('overlay-title').innerHTML = 'Take a <span>breather.</span>';
+      $('overlay-message').textContent = 'Your run is paused. Start playing to resume.';
+      startButton.textContent = 'Resume run';
+      pauseButton.innerHTML = 'Resume <kbd>SPACE</kbd>';
+    } else if (game.state === 'paused') {
+      game.state = 'playing'; overlay.classList.add('hidden');
+      pauseButton.innerHTML = 'Pause <kbd>SPACE</kbd>';
+      lastTime = performance.now(); requestAnimationFrame(frame);
+    }
+  }
+
+  startButton.addEventListener('click', () => {
+    if (game?.state === 'paused') { togglePause(); return; }
+    start();
+  });
+  nameInput.addEventListener('keydown', event => { if (event.key === 'Enter') start(); });
+  pauseButton.addEventListener('click', togglePause);
+  window.addEventListener('keydown', event => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift'].includes(event.key)) event.preventDefault();
+    keys[event.key] = true;
+    if (event.code === 'Space' && game?.state === 'paused') togglePause();
+  });
+  window.addEventListener('keyup', event => { keys[event.key] = false; });
+  canvas.addEventListener('pointermove', event => steerTo(event.clientX, event.clientY));
+  canvas.addEventListener('pointerdown', event => steerTo(event.clientX, event.clientY));
+  if (mobileBoost) {
+    mobileBoost.addEventListener('pointerdown', event => { event.preventDefault(); mobileBoost.dataset.down = '1'; });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(type => mobileBoost.addEventListener(type, () => { mobileBoost.dataset.down = '0'; }));
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) keys.Space = false; });
+  resize();
+})();
