@@ -45,5 +45,10 @@
   </main>
   <footer><a class="wordmark" href="#home">SNAKE<span>CLASH</span><small>BY C00LBOSS</small></a><span>A snake arcade style game by C00lBoss.</span><a href="#home">Back to top ↑</a></footer>
   <script src="game.js"></script>
+  <script src="global-leaderboard.js"></script>
+  window.SnakeLeaderboard?.submitScore(
+  game.player.name,
+  Math.floor(game.player.mass)
+);
 </body>
 </html>
