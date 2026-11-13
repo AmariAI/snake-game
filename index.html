@@ -7,24 +7,26 @@
   <meta name="description" content="Snake Clash — a neon arcade arena. Eat, grow, and outlast the rivals.">
   <title>Snake Clash — Neon Arena</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="season-pass.css">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="#home" aria-label="Snake Clash home"><span class="brand-mark">S</span><span>SNAKE<span class="brand-accent">CLASH</span><small>ARCADE ARENA</small></span></a>
-    <nav aria-label="Main navigation"><a href="#play">Arena</a><a href="#leaderboard">Leaderboard</a><a href="#controls">Controls</a></nav>
-    <a class="top-cta" href="#play">Play now <span>↗</span></a>
+    <nav aria-label="Main navigation"><a href="#home">Home</a><a href="#play">Arena</a><a href="#season">Season pass</a></nav>
+    <a class="top-cta" href="#season">Shop & rewards <span>↗</span></a>
   </header>
-
   <main id="home">
     <section class="intro wrap">
-      <div class="intro-copy">
-        <p class="eyebrow"><span class="pulse-dot"></span> SOLO ARCADE · LIVE NOW</p>
-        <h1>Own the<br><span>neon arena.</span></h1>
-        <p class="intro-text">Eat glowing energy, outmaneuver rival bots, and build the biggest snake in the arena. One more run starts now.</p>
-        <a class="button button-lime" href="#play">Enter the arena <span>→</span></a>
-      </div>
-      <div class="intro-art" aria-hidden="true"><div class="art-ring ring-a"></div><div class="art-ring ring-b"></div><div class="art-glow"></div><span class="art-snake">〰</span><i class="art-orb orb-one"></i><i class="art-orb orb-two"></i><div class="art-chip chip-one">+ MASS</div><div class="art-chip chip-two">⚡ BOOST</div></div>
-      <div class="intro-foot"><span>01 — ARCADE MODE</span><span>BUILT FOR THE HUNGRY</span><span>SCROLL TO PLAY ↓</span></div>
+      <div class="intro-copy"><p class="eyebrow"><span class="pulse-dot"></span> SOLO ARCADE · LIVE NOW</p><h1>Own the<br><span>neon arena.</span></h1><p class="intro-text">Eat glowing energy, outmaneuver rival bots, and build the biggest snake in the arena. Play runs to earn coins and unlock your look.</p><a class="button button-lime" href="#play">Enter the arena <span>→</span></a></div>
+      <div class="intro-art" aria-hidden="true"><div class="art-ring ring-a"></div><div class="art-ring ring-b"></div><div class="art-glow"></div><span class="art-snake">〰</span><i class="art-orb orb-one"></i><i class="art-orb orb-two"></i><div class="art-chip chip-one">+ COINS</div><div class="art-chip chip-two">✦ REWARDS</div></div>
+      <div class="intro-foot"><span>01 — ARCADE MODE</span><span>PLAY · EARN · CUSTOMIZE</span><span>SCROLL TO PLAY ↓</span></div>
+    </section>
+
+    <section class="season-section wrap" id="season" aria-labelledby="season-title">
+      <div class="season-heading"><div><p class="eyebrow">SEASON 01 · NEON FRONTIER</p><h2 id="season-title">Your next look is <span>earned.</span></h2></div><div class="wallet"><span>YOUR COINS</span><b id="season-coins">0</b><i>◆</i></div></div>
+      <div class="pass-card"><div class="pass-top"><div><p class="eyebrow">FREE SEASON PASS</p><h3>Play runs. Build your legacy.</h3></div><div class="pass-level"><span>PASS LEVEL</span><b id="season-level">1</b></div></div><div class="pass-track"><div class="pass-progress"><span id="season-progress"></span></div><div class="pass-xp"><span id="season-xp">0 XP</span><span id="season-next">100 XP to next reward</span></div></div><div class="season-reward" id="season-reward" role="status">Finish runs to earn coins and season XP.</div></div>
+      <div class="shop-heading"><div><p class="eyebrow">THE GEAR BAY</p><h3>Skins & accessories</h3></div><p>Earn coins by playing. Buy an item, then equip it for your next run.</p></div>
+      <div class="shop-grid" id="season-shop" aria-live="polite"></div>
     </section>
 
     <section class="arena-section wrap" id="play">
@@ -32,27 +34,17 @@
       <div class="arena-grid">
         <section class="game-shell" aria-label="Snake Clash game">
           <div class="game-bar"><div class="live-label"><span class="pulse-dot"></span> ARENA LIVE</div><div class="hud"><span>MASS <b id="score">0</b></span><span>BEST <b id="best">0</b></span><span>KOs <b id="kills">0</b></span></div></div>
-          <div class="canvas-wrap">
-            <canvas id="game" aria-label="Snake game arena"></canvas>
-            <div class="game-overlay" id="overlay"><div class="start-card"><span class="start-icon">🐍</span><p class="eyebrow">READY WHEN YOU ARE</p><h3 id="overlay-title">Claim your<br><span>space.</span></h3><p id="overlay-message">Collect orbs, dodge rival snakes, and become the biggest in the arena.</p><label class="name-label" for="player-name">YOUR SNAKE NAME</label><input id="player-name" maxlength="14" value="Player" autocomplete="nickname"><button class="button button-lime start-button" id="start-button">Start playing <span>→</span></button></div></div>
-            <div class="boost-mobile"><button id="mobile-boost" aria-label="Hold to boost">⚡</button></div>
-            <div class="arena-coords" aria-hidden="true"><span>SECTOR 01</span><span>2,600 × 1,900</span></div>
-          </div>
+          <div class="canvas-wrap"><canvas id="game" aria-label="Snake game arena"></canvas><div class="game-overlay" id="overlay"><div class="start-card"><span class="start-icon">🐍</span><p class="eyebrow">READY WHEN YOU ARE</p><h3 id="overlay-title">Claim your<br><span>space.</span></h3><p id="overlay-message">Collect orbs, dodge rival snakes, and become the biggest in the arena.</p><label class="name-label" for="player-name">YOUR SNAKE NAME</label><input id="player-name" maxlength="14" value="Player" autocomplete="nickname"><button class="button button-lime start-button" id="start-button">Start playing <span>→</span></button></div></div><div class="boost-mobile"><button id="mobile-boost" aria-label="Hold to boost">⚡</button></div><div class="arena-coords" aria-hidden="true"><span>SECTOR 01</span><span>2,600 × 1,900</span></div></div>
           <div class="game-footer"><span id="game-status">Move mouse / finger to steer · WASD or arrows also work</span><button id="pause-button" class="pause-button" disabled>Pause <kbd>SPACE</kbd></button></div>
         </section>
-        <aside class="side-stack">
-          <section class="info-card standings-card"><div class="card-heading"><div><p class="eyebrow">THIS RUN</p><h3>Arena standings</h3></div><span class="trophy">♛</span></div><ol id="leaderboard"><li><span>1. Ready to play</span><b>—</b></li></ol><p class="card-note">You and the rival bots</p></section>
-          <section class="info-card tip-card"><span class="tip-symbol">✳</span><p class="eyebrow">FIELD TIP</p><h3>Boost with a plan.</h3><p>Speed helps you escape or intercept. It costs mass, so make every burst count.</p><div class="tip-key"><kbd>SPACE</kbd><span>hold to boost</span></div></section>
-          <section class="mini-stats"><div><b>11</b><span>RIVAL BOTS</span></div><div><b>∞</b><span>MORE RUNS</span></div></section>
-        </aside>
+        <aside class="side-stack"><section class="info-card standings-card"><div class="card-heading"><div><p class="eyebrow">THIS RUN</p><h3>Arena standings</h3></div><span class="trophy">♛</span></div><ol id="leaderboard"><li><span>1. Ready to play</span><b>—</b></li></ol><p class="card-note">You and the rival bots</p></section><section class="info-card tip-card"><span class="tip-symbol">✳</span><p class="eyebrow">FIELD TIP</p><h3>Boost with a plan.</h3><p>Speed helps you escape or intercept. It costs mass, so make every burst count.</p><div class="tip-key"><kbd>SPACE</kbd><span>hold to boost</span></div></section><section class="mini-stats"><div><b>11</b><span>RIVAL BOTS</span></div><div><b>∞</b><span>MORE RUNS</span></div></section></aside>
       </div>
-      <div id="leaderboard"></div>
+      <div id="global-leaderboard-mount"></div>
     </section>
-
     <section class="controls-section" id="controls"><div class="wrap"><div class="section-title"><div><p class="eyebrow">EASY TO LEARN · HARD TO PUT DOWN</p><h2>Know the <span>moves.</span></h2></div><p>Three simple rules between you<br>and the top of the board.</p></div><div class="control-grid"><article><span class="control-icon">✦</span><small>01 / GROW</small><h3>Eat to grow</h3><p>Guide your snake through glowing orbs to build mass and length.</p></article><article><span class="control-icon">⌁</span><small>02 / SURVIVE</small><h3>Steer smart</h3><p>Use your mouse, touchscreen, or keyboard. Avoid walls and snake bodies.</p></article><article><span class="control-icon">ϟ</span><small>03 / OUTPLAY</small><h3>Boost & clash</h3><p>Hold Space, Shift, or the boost button to burst forward at a cost.</p></article></div></div></section>
   </main>
-
   <footer class="wrap"><a class="brand footer-brand" href="#home"><span class="brand-mark">S</span><span>SNAKE<span class="brand-accent">CLASH</span><small>ARCADE ARENA</small></span></a><span>Made for one more run.</span><a href="#home">Back to top ↑</a></footer>
+  <script src="progression.js"></script>
   <script src="game.js"></script>
   <script src="global-leaderboard.js"></script>
 </body>
