@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: snake-clash-multiplayer
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
