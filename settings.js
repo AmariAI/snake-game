@@ -5,6 +5,13 @@
   const openButton = document.getElementById('settings-open');
   const dialog = document.getElementById('settings-dialog');
   const toggle = document.getElementById('mobile-friendly-toggle');
+
+  // Load the clan quick-access panel on pages that already include settings.js.
+  const clansScript = document.createElement('script');
+  clansScript.src = 'clans.js';
+  clansScript.defer = true;
+  document.body.appendChild(clansScript);
+
   if (!openButton || !dialog || !toggle) return;
 
   let enabled = false;
