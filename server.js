@@ -14,6 +14,7 @@ const MAX_PLAYERS_PER_ROOM = 12;
 const MAX_CONNECTIONS = 300;
 const MAX_CLANS = 100;
 const MAX_CLAN_MEMBERS = 30;
+const CLAN_CREATION_COST = 10000;
 const TICK_MS = 50;
 const FOOD_TARGET = 160;
 const COLORS = ['#ff7179', '#5ab9ff', '#c57cff', '#ffb35d', '#ff70ce', '#53dfb9', '#e9df56', '#929bff'];
@@ -42,97 +43,142 @@ function safeClanName(value) {
   return String(value || '').replace(/[<>\u0000-\u001f]/g, '').trim().replace(/\s+/g, ' ').slice(0, 24);
 }
 function clanList() {
-  return [...clans.values()]
-    .sort((a, b) => b.members.size - a.members.size || a.name.localeCompare(b.name))
-    .map(clan => ({ id: clan.id, name: clan.name, members: clan.members.size, leader: clan.leaderName }));
+  return [...clans.values()].sort((a, b) => b.members.size - a.members.size || a.name.localeCompare(b.name))
+    .map(clan => ({ id: clan.id, name: clan.name, members: clan.members.size, pending: clan.requests.size, leader: clan.leaderName }));
 }
 function sendClanList(socket) { send(socket, { type: 'clans:list', clans: clanList() }); }
+function sendClanListsToAll() { for (const socket of sockets) if (socket.clanClient) sendClanList(socket); }
 function sendClanProfile(socket, clan) {
-  send(socket, { type: 'clans:profile', clan: { id: clan.id, name: clan.name, leader: clan.leaderName, members: [...clan.members.values()].map(member => member.name) } });
+  send(socket, { type: 'clans:profile', clan: {
+    id: clan.id, name: clan.name, leader: clan.leaderName,
+    members: [...clan.members.values()].map(member => ({ id: member.id, name: member.name })),
+    requests: clan.leaderId === socket.clanMemberId ? [...clan.requests.values()].map(request => ({ id: request.id, name: request.name })) : []
+  } });
 }
-function removeFromClan(socket) {
+function pushClanProfile(clan) {
+  for (const member of clan.members.values()) if (member.socket) sendClanProfile(member.socket, clan);
+}
+function removeMember(socket) {
   if (!socket.clanId || !socket.clanMemberId) return;
   const clan = clans.get(socket.clanId);
   if (clan) {
-    clan.members.delete(socket.clanMemberId);
-    if (!clan.members.size) clans.delete(clan.id);
-    else {
-      if (clan.leaderId === socket.clanMemberId) {
-        const next = clan.members.entries().next().value;
-        clan.leaderId = next[0];
-        clan.leaderName = next[1].name;
-      }
-      for (const member of clan.members.values()) sendClanProfile(member.socket, clan);
-    }
+    const member = clan.members.get(socket.clanMemberId);
+    if (member?.socket === socket) member.socket = null;
   }
   socket.clanId = null;
   socket.clanMemberId = null;
 }
-function handleClanMessage(socket, message) {
+function validateMember(socket, message) {
   const memberId = String(message.memberId || '');
-  const memberName = safeName(message.name);
   if (!/^[\w-]{8,80}$/.test(memberId)) {
     send(socket, { type: 'clans:error', message: 'Could not identify your device. Refresh and try again.' });
+    return null;
+  }
+  const name = safeName(message.name);
+  socket.clanClient = true;
+  socket.clanMemberId = memberId;
+  socket.clanName = name;
+  return { id: memberId, name };
+}
+function clanMessage(socket, message) {
+  const identity = validateMember(socket, message);
+  if (!identity) return;
+
+  if (message.type === 'clans:list') {
+    sendClanList(socket);
+    const clan = [...clans.values()].find(item => item.members.has(identity.id));
+    if (clan) {
+      removeMember(socket);
+      clan.members.get(identity.id).socket = socket;
+      socket.clanId = clan.id;
+      pushClanProfile(clan);
+    } else send(socket, { type: 'clans:profile', clan: null });
     return;
   }
-  if (message.type === 'clans:list') { sendClanList(socket); return; }
+
   if (message.type === 'clans:create') {
     const name = safeClanName(message.clanName);
-    if (name.length < 2) { send(socket, { type: 'clans:error', message: 'Clan names must be at least 2 characters.' }); return; }
-    if (clans.size >= MAX_CLANS) { send(socket, { type: 'clans:error', message: 'The clan list is full right now.' }); return; }
+    const coins = Math.floor(Number(message.coins));
+    if (!name || name.length < 2) { send(socket, { type: 'clans:error', message: 'Clan names must be at least 2 characters.' }); return; }
+    if (!Number.isFinite(coins) || coins < CLAN_CREATION_COST) {
+      send(socket, { type: 'clans:error', message: `Creating a clan costs ${CLAN_CREATION_COST.toLocaleString()} coins.` }); return;
+    }
     if ([...clans.values()].some(clan => clan.name.toLowerCase() === name.toLowerCase())) {
       send(socket, { type: 'clans:error', message: 'That clan name is already taken.' }); return;
     }
-    removeFromClan(socket);
+    if (clans.size >= MAX_CLANS) { send(socket, { type: 'clans:error', message: 'The clan list is full right now.' }); return; }
+    if ([...clans.values()].some(clan => clan.members.has(identity.id))) {
+      send(socket, { type: 'clans:error', message: 'Leave your current clan before creating another.' }); return;
+    }
     const id = crypto.randomBytes(4).toString('hex').toUpperCase();
-    const clan = { id, name, leaderId: memberId, leaderName: memberName, members: new Map() };
-    clan.members.set(memberId, { name: memberName, socket });
+    const clan = { id, name, leaderId: identity.id, leaderName: identity.name, members: new Map(), requests: new Map() };
+    clan.members.set(identity.id, { ...identity, socket });
     clans.set(id, clan);
-    socket.clanId = id; socket.clanMemberId = memberId;
-    send(socket, { type: 'clans:joined', clanId: id });
-    sendClanProfile(socket, clan); sendClanListToAll();
+    socket.clanId = id;
+    send(socket, { type: 'clans:created', clanId: id, cost: CLAN_CREATION_COST });
+    pushClanProfile(clan); sendClanListsToAll();
     return;
   }
-  if (message.type === 'clans:join') {
+
+  if (message.type === 'clans:request') {
     const clan = clans.get(String(message.clanId || '').toUpperCase());
     if (!clan) { send(socket, { type: 'clans:error', message: 'That clan no longer exists. Refresh the list.' }); return; }
-    if (!clan.members.has(memberId) && clan.members.size >= MAX_CLAN_MEMBERS) {
-      send(socket, { type: 'clans:error', message: 'That clan is full.' }); return;
+    if ([...clans.values()].some(item => item.members.has(identity.id))) {
+      send(socket, { type: 'clans:error', message: 'Leave your current clan before requesting to join another.' }); return;
     }
-    removeFromClan(socket);
-    clan.members.set(memberId, { name: memberName, socket });
-    socket.clanId = clan.id; socket.clanMemberId = memberId;
-    send(socket, { type: 'clans:joined', clanId: clan.id });
-    for (const member of clan.members.values()) sendClanProfile(member.socket, clan);
-    sendClanListToAll();
+    if (clan.members.has(identity.id)) { send(socket, { type: 'clans:error', message: 'You are already in that clan.' }); return; }
+    if (clan.members.size >= MAX_CLAN_MEMBERS) { send(socket, { type: 'clans:error', message: 'That clan is full.' }); return; }
+    clan.requests.set(identity.id, identity);
+    send(socket, { type: 'clans:request-sent', clanId: clan.id, name: clan.name });
+    pushClanProfile(clan); sendClanListsToAll();
     return;
   }
+
+  if (message.type === 'clans:decision') {
+    const clan = clans.get(String(message.clanId || '').toUpperCase());
+    const requestId = String(message.requestId || '');
+    if (!clan || clan.leaderId !== identity.id) { send(socket, { type: 'clans:error', message: 'Only the clan leader can review requests.' }); return; }
+    const request = clan.requests.get(requestId);
+    if (!request) { send(socket, { type: 'clans:error', message: 'That join request is no longer pending.' }); return; }
+    clan.requests.delete(requestId);
+    if (message.approve === true) {
+      if (clan.members.size >= MAX_CLAN_MEMBERS) { send(socket, { type: 'clans:error', message: 'Your clan is full.' }); pushClanProfile(clan); return; }
+      clan.members.set(request.id, { ...request, socket: null });
+      send(socket, { type: 'clans:request-approved', name: request.name });
+    } else send(socket, { type: 'clans:request-declined', name: request.name });
+    pushClanProfile(clan); sendClanListsToAll();
+    return;
+  }
+
   if (message.type === 'clans:leave') {
-    removeFromClan(socket);
-    send(socket, { type: 'clans:left' });
-    sendClanListToAll();
+    const clan = clans.get(socket.clanId);
+    if (!clan || !clan.members.has(identity.id)) { send(socket, { type: 'clans:error', message: 'You are not in a clan.' }); return; }
+    clan.members.delete(identity.id);
+    socket.clanId = null;
+    if (!clan.members.size) clans.delete(clan.id);
+    else {
+      if (clan.leaderId === identity.id) {
+        const next = clan.members.values().next().value;
+        clan.leaderId = next.id; clan.leaderName = next.name;
+      }
+      pushClanProfile(clan);
+    }
+    send(socket, { type: 'clans:left' }); sendClanListsToAll();
   }
 }
-function sendClanListToAll() {
-  for (const socket of sockets) if (socket.clanClient) sendClanList(socket);
-}
+
 function createFood() {
   return { x: 25 + Math.random() * (WORLD.width - 50), y: 25 + Math.random() * (WORLD.height - 50), color: COLORS[Math.floor(Math.random() * COLORS.length)], value: 1 };
 }
 function createRoom(code) {
   const room = { code, players: new Map(), food: Array.from({ length: FOOD_TARGET }, createFood), lastBroadcast: 0 };
-  rooms.set(code, room);
-  return room;
+  rooms.set(code, room); return room;
 }
 function createPlayer(socket, name, room) {
-  const id = crypto.randomUUID();
-  const x = 180 + Math.random() * (WORLD.width - 360);
-  const y = 180 + Math.random() * (WORLD.height - 360);
+  const id = crypto.randomUUID(), x = 180 + Math.random() * (WORLD.width - 360), y = 180 + Math.random() * (WORLD.height - 360);
   const parts = Array.from({ length: 12 }, (_, i) => ({ x: x - i * 12, y }));
   const player = { id, name, color: COLORS[room.players.size % COLORS.length], x, y, angle: 0, target: 0, mass: 120, parts, alive: true, shieldUntil: Date.now() + 2500, boosting: false, socket };
-  room.players.set(id, player);
-  socket.playerId = id; socket.roomCode = room.code;
-  return player;
+  room.players.set(id, player); socket.playerId = id; socket.roomCode = room.code; return player;
 }
 function joinRoom(socket, message) {
   const codeInput = String(message.room || '').trim().toUpperCase();
@@ -162,8 +208,8 @@ function removePlayer(socket) {
 function handleMessage(socket, raw) {
   let message;
   try { message = JSON.parse(raw.toString()); } catch { send(socket, { type: 'error', message: 'Invalid message.' }); return; }
-  if (!message || typeof message !== 'object') return;
-  if (message.type.startsWith('clans:')) { socket.clanClient = true; handleClanMessage(socket, message); return; }
+  if (!message || typeof message !== 'object' || typeof message.type !== 'string') return;
+  if (message.type.startsWith('clans:')) { clanMessage(socket, message); return; }
   if (message.type === 'join') {
     if (socket.roomCode) { send(socket, { type: 'error', message: 'You are already in a room.' }); return; }
     joinRoom(socket, message); return;
@@ -191,9 +237,7 @@ function updateRoom(room, dt) {
       const previous = player.parts[i - 1], segment = player.parts[i], dx = previous.x - segment.x, dy = previous.y - segment.y, distance = Math.hypot(dx, dy);
       if (distance > 12) { segment.x += dx / distance * (distance - 12); segment.y += dy / distance * (distance - 12); }
     }
-    if (player.x < 22 || player.y < 22 || player.x > WORLD.width - 22 || player.y > WORLD.height - 22) {
-      player.alive = false; send(player.socket, { type: 'died', reason: 'You hit the arena wall.' }); continue;
-    }
+    if (player.x < 22 || player.y < 22 || player.x > WORLD.width - 22 || player.y > WORLD.height - 22) { player.alive = false; send(player.socket, { type: 'died', reason: 'You hit the arena wall.' }); continue; }
     const foodIndex = room.food.findIndex(food => (player.x - food.x) ** 2 + (player.y - food.y) ** 2 < 400);
     if (foodIndex >= 0) { room.food.splice(foodIndex, 1); player.mass += 2.7; }
     if (player.shieldUntil <= now) {
@@ -212,15 +256,12 @@ function updateRoom(room, dt) {
 }
 const server = http.createServer((request, response) => {
   let pathname;
-  try { pathname = decodeURIComponent(new URL(request.url, `http://${request.headers.host || 'localhost'}`).pathname); }
-  catch { response.writeHead(400); response.end('Bad request'); return; }
-  const requested = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
-  const file = path.resolve(ROOT, requested);
+  try { pathname = decodeURIComponent(new URL(request.url, `http://${request.headers.host || 'localhost'}`).pathname); } catch { response.writeHead(400); response.end('Bad request'); return; }
+  const requested = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, ''), file = path.resolve(ROOT, requested);
   if (file !== ROOT && !file.startsWith(`${ROOT}${path.sep}`)) { response.writeHead(403); response.end('Forbidden'); return; }
   fs.readFile(file, (error, contents) => {
     if (error) { response.writeHead(error.code === 'ENOENT' ? 404 : 500); response.end('Not found'); return; }
-    response.writeHead(200, { 'Content-Type': mimeTypes[path.extname(file)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-cache' });
-    response.end(contents);
+    response.writeHead(200, { 'Content-Type': mimeTypes[path.extname(file)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-cache' }); response.end(contents);
   });
 });
 const wss = new WebSocketServer({ server, maxPayload: 4096, perMessageDeflate: false });
@@ -229,8 +270,8 @@ wss.on('connection', socket => {
   sockets.add(socket); socket.isAlive = true;
   socket.on('pong', () => { socket.isAlive = true; });
   socket.on('message', raw => handleMessage(socket, raw));
-  socket.on('close', () => { sockets.delete(socket); removePlayer(socket); removeFromClan(socket); });
-  socket.on('error', () => { sockets.delete(socket); removePlayer(socket); removeFromClan(socket); });
+  socket.on('close', () => { sockets.delete(socket); removePlayer(socket); removeMember(socket); });
+  socket.on('error', () => { sockets.delete(socket); removePlayer(socket); removeMember(socket); });
 });
 setInterval(() => { for (const socket of wss.clients) { if (!socket.isAlive) { socket.terminate(); continue; } socket.isAlive = false; socket.ping(); } }, 30000).unref();
 setInterval(() => { for (const room of rooms.values()) updateRoom(room, TICK_MS / 1000); }, TICK_MS).unref();
